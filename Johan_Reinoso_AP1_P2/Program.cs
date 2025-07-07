@@ -1,4 +1,8 @@
+using Blazored.Toast;
 using Johan_Reinoso_AP1_P2.Components;
+using Johan_Reinoso_AP1_P2.Components.DAL;
+using Johan_Reinoso_AP1_P2.Components.Service;
+using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -6,6 +10,13 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+
+builder.Services.AddBlazoredToast();
+
+var conStr = builder.Configuration.GetConnectionString("SqlServerConStr");
+builder.Services.AddDbContextFactory<Contexto>(o => o.UseSqlServer(conStr));
+
+builder.Services.AddScoped<ParcialService>();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
