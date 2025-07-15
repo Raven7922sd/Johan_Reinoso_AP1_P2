@@ -1,13 +1,14 @@
 ﻿@page "/Entradas/Create"
 @inject EntradasService entradaService
 @inject ProductoService productoService
+@inject NavigationManager navigationManager
+@rendermode InteractiveServer
 @inject IToastService toastService
 @using Johan_Reinoso_AP1_P2.Components.Models
 @using Blazored.Toast.Services
 
-<EditForm Model="@entrada" OnValidSubmit="GuardarEntrada">
+<EditForm Model="@entrada" OnValidSubmit="GuardarEntrada" FormName="Entrada">
 	<DataAnnotationsValidator />
-	<ValidationSummary />
 
 	<div class="container">
 		<div class="card shadow-lg">
@@ -40,17 +41,19 @@
 					<div class="input-group input-group-sm mb-2 align-items-center mt-2">
 						<span class="input-group-text py-2 px-2">Producto:</span>
 						<InputSelect class="form-select form-select-sm py-2" @bind-Value="SelectedProductoId">
-							<option value="0" selected disabled>-- Seleccione un producto --</option>
+							<option value="0" selected disabled>Seleccione un producto</option>
 							@foreach (var producto in ProductosDisponibles)
 							{
 								<option value="@producto.ProductoId">@producto.Descripcion</option>
 							}
 						</InputSelect>
+						<ValidationMessage For="(() => entradasDetalles.ProductoId)" />
 
 						<span class="input-group-text py-2 px-2 ms-2">Cantidad:</span>
 						<InputNumber class="form-control form-control-sm py-2" @bind-Value="CantidadDetalle" placeholder="Cantidad" />
+						<ValidationMessage For="(() => entradasDetalles.Cantidad)" />
 
-						<button class="btn btn-primary btn-sm bi bi-plus-square py-2 ms-2" type="button" @onclick="AgregarProductoDetalle">
+						<button class="btn btn-primary btn-sm bi bi-plus-square py-2 ms-2" type="button" @onclick="AgregarProductoDetalleService">
 							Agregar
 						</button>
 					</div>
@@ -60,7 +63,6 @@
 					<table class="table table-light">
 						<thead class="table table-striped">
 							<tr class="text-center">
-								<th>Id Detalle</th>
 								<th>ProductoId</th>
 								<th>Descripcion</th>
 								<th>Cantidad</th>
@@ -73,7 +75,6 @@
 								@foreach (var detalle in entrada.EntradasDetalles)
 								{
 									<tr class="text-center">
-										<td>@(detalle.EntradasDetallesId == 0 ? "Nuevo" : detalle.EntradasDetallesId.ToString())</td>
 										<td>@detalle.Producto?.ProductoId</td>
 										<td>@detalle.Producto?.Descripcion</td>
 										<td>@detalle.Cantidad</td>
@@ -89,7 +90,7 @@
 							else
 							{
 								<tr>
-									<td colspan="5" class="text-center">No hay productos agregados al detalle.</td>
+									<td colspan="6" class="text-center">No hay productos agregados al detalle.</td>
 								</tr>
 							}
 						</tbody>
@@ -110,6 +111,8 @@
 
 @code {
 	private Entradas entrada = new Entradas();
+	private EntradasDetalles entradasDetalles { get; set; } = new EntradasDetalles();
+
 	private List<Productos> ProductosDisponibles = new List<Productos>();
 
 	private int SelectedProductoId { get; set; }
@@ -128,16 +131,23 @@
 
 	private async Task GuardarEntrada()
 	{
+		var productoSeleccionadoPrincipal = ProductosDisponibles.FirstOrDefault(p => p.ProductoId == entrada.IdProducido);
+		if (productoSeleccionadoPrincipal != null)
+		{
+			entrada.PesoTotal = productoSeleccionadoPrincipal.Peso * entrada.CantidadProducida;
+		}
+
 		var guardado = await entradaService.Guardar(entrada);
 
 		if (guardado)
 		{
 			toastService.ShowSuccess("Entrada guardada exitosamente!");
+			navigationManager.NavigateTo("/Entradas/Index");
 			Nuevo();
 		}
 		else
 		{
-			toastService.ShowError("Error al guardar la entrada.");
+			toastService.ShowError("Error al guardar la entrada, verifique el producto y la cantidad.");
 		}
 	}
 
@@ -150,37 +160,29 @@
 		CantidadDetalle = 0;
 	}
 
-	private void AgregarProductoDetalle()
+	private async Task AgregarProductoDetalleService()
 	{
-		if (SelectedProductoId == 0 || CantidadDetalle <= 0)
+		if (SelectedProductoId <= 0)
 		{
-			toastService.ShowWarning("Debe seleccionar un producto e ingresar una cantidad válida.");
+			toastService.ShowWarning("Debe seleccionar un producto válido.");
 			return;
 		}
 
-		var productoSeleccionado = ProductosDisponibles.FirstOrDefault(p => p.ProductoId == SelectedProductoId);
-		if (productoSeleccionado == null)
+		if (CantidadDetalle <= 0)
 		{
-			toastService.ShowError("Producto seleccionado no encontrado.");
+			toastService.ShowWarning("Debe ingresar una cantidad válida mayor que cero.");
 			return;
 		}
 
-		var detalleExistente = entrada.EntradasDetalles.FirstOrDefault(d => d.ProductoId == SelectedProductoId);
-		if (detalleExistente != null)
+		bool agregado = await entradaService.AgregarProductoDetalle(entrada, SelectedProductoId, CantidadDetalle);
+
+		if (agregado)
 		{
-			detalleExistente.Cantidad += CantidadDetalle;
-			toastService.ShowInfo($"Cantidad actualizada para {productoSeleccionado.Descripcion}. Nueva cantidad: {detalleExistente.Cantidad}");
+			toastService.ShowSuccess("Producto agregado al detalle.");
 		}
 		else
 		{
-			var nuevoDetalle = new EntradasDetalles
-			{
-				ProductoId = SelectedProductoId,
-				Producto = productoSeleccionado,
-				Cantidad = CantidadDetalle,
-			};
-			entrada.EntradasDetalles.Add(nuevoDetalle);
-			toastService.ShowSuccess("Producto agregado al detalle.");
+			toastService.ShowError("La cantidad seleccionada supera a la existencia.");
 		}
 
 		SelectedProductoId = 0;
@@ -191,8 +193,13 @@
 
 	private void RemoverProductoDetalle(EntradasDetalles detalleToRemove)
 	{
+		SelectedProductoId = detalleToRemove.ProductoId;
+		CantidadDetalle = detalleToRemove.Cantidad;
+
 		entrada.EntradasDetalles.Remove(detalleToRemove);
+
 		toastService.ShowInfo("Producto removido del detalle.");
+
 		StateHasChanged();
 	}
 }
