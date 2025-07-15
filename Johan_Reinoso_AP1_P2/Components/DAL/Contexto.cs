@@ -20,7 +20,7 @@ public class Contexto : DbContext
             {
                 ProductoId = 1,
                 Descripcion = "Maní",
-                Peso = 0,
+                Peso = 5,
                 Existencia = 100,
                 EsCompuesto = false
             },
@@ -28,7 +28,7 @@ public class Contexto : DbContext
             {
                 ProductoId = 2,
                 Descripcion = "Pistachos",
-                Peso = 0,
+                Peso = 10,
                 Existencia = 100,
                 EsCompuesto = false
             },
@@ -36,7 +36,7 @@ public class Contexto : DbContext
             {
                 ProductoId = 3,
                 Descripcion = "Almendras",
-                Peso = 0,
+                Peso = 8,
                 Existencia = 100,
                 EsCompuesto = false
             },
