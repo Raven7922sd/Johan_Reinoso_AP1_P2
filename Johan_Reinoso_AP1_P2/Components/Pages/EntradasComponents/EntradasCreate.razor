@@ -1,0 +1,205 @@
+﻿@page "/Entradas/Create"
+@inject EntradasService entradaService
+@inject ProductoService productoService
+@inject NavigationManager navigationManager
+@rendermode InteractiveServer
+@inject IToastService toastService
+@using Johan_Reinoso_AP1_P2.Components.Models
+@using Blazored.Toast.Services
+
+<EditForm Model="@entrada" OnValidSubmit="GuardarEntrada" FormName="Entrada">
+	<DataAnnotationsValidator />
+
+	<div class="container">
+		<div class="card shadow-lg">
+			<div class="card-header">
+				<h4 class="card-title position-relative text-center">Registro de Entrada</h4>
+			</div>
+
+			<div class="card-body">
+				<div class="mb-4">
+					<label class="form-label"><strong>Entrada Id</strong></label>
+					<InputNumber class="form-control" @bind-Value="entrada.EntradasId" readonly />
+				</div>
+
+				<div class="form-group mb-3">
+					<label for="concepto">Concepto:</label>
+					<InputText id="concepto" class="form-control " @bind-Value="entrada.Concepto" placeholder="Agregue un concepto" />
+					<ValidationMessage For="@(() => entrada.Concepto)" />
+				</div>
+
+				<div class="form-group mb-3">
+					<label for="fecha">Fecha:</label>
+					<InputDate id="fecha" class="form-control" @bind-Value="entrada.Fecha" />
+					<ValidationMessage For="@(() => entrada.Fecha)" />
+				</div>
+
+				<div class="border border-success p-3 mt-3">
+
+					<h5 class="text-center mb-4 mt-3">Detalle de Productos de Entrada</h5>
+
+					<div class="input-group input-group-sm mb-2 align-items-center mt-2">
+						<span class="input-group-text py-2 px-2">Producto:</span>
+						<InputSelect class="form-select form-select-sm py-2" @bind-Value="SelectedProductoId">
+							<option value="0" selected disabled>Seleccione un producto</option>
+							@foreach (var producto in ProductosDisponibles)
+							{
+								<option value="@producto.ProductoId">@producto.Descripcion</option>
+							}
+						</InputSelect>
+						<ValidationMessage For="(() => entradasDetalles.ProductoId)" />
+
+						<span class="input-group-text py-2 px-2 ms-2">Cantidad:</span>
+						<InputNumber class="form-control form-control-sm py-2" @bind-Value="CantidadDetalle" placeholder="Cantidad" />
+						<ValidationMessage For="(() => entradasDetalles.Cantidad)" />
+
+						<button class="btn btn-primary btn-sm bi bi-plus-square py-2 ms-2" type="button" @onclick="AgregarProductoDetalleService">
+							Agregar
+						</button>
+					</div>
+
+					<hr />
+
+					<table class="table table-light">
+						<thead class="table table-striped">
+							<tr class="text-center">
+								<th>ProductoId</th>
+								<th>Descripcion</th>
+								<th>Cantidad</th>
+								<th>Remover</th>
+							</tr>
+						</thead>
+						<tbody>
+							@if (entrada.EntradasDetalles != null && entrada.EntradasDetalles.Any())
+							{
+								@foreach (var detalle in entrada.EntradasDetalles)
+								{
+									<tr class="text-center">
+										<td>@detalle.Producto?.ProductoId</td>
+										<td>@detalle.Producto?.Descripcion</td>
+										<td>@detalle.Cantidad</td>
+										<td>
+											<button type="button" class="btn btn-outline-danger bi bi-trash"
+													@onclick="() => RemoverProductoDetalle(detalle)">
+												Remover
+											</button>
+										</td>
+									</tr>
+								}
+							}
+							else
+							{
+								<tr>
+									<td colspan="6" class="text-center">No hay productos agregados al detalle.</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+
+				<div class="card-footer text-center mt-2">
+					<div class="btn-group" role="group">
+						<button type="reset" class="btn btn-outline-primary bi bi-arrow-clockwise" @onclick="Nuevo">Limpiar</button>
+						<button type="submit" class="btn btn-outline-success bi bi-floppy"> Guardar</button>
+						<a href="/Entradas/Index" class="btn btn-outline-secondary"><span class="bi bi-box-arrow-left"></span> Volver</a>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</EditForm>
+
+@code {
+	private Entradas entrada = new Entradas();
+	private EntradasDetalles entradasDetalles { get; set; } = new EntradasDetalles();
+
+	private List<Productos> ProductosDisponibles = new List<Productos>();
+
+	private int SelectedProductoId { get; set; }
+	private int CantidadDetalle { get; set; }
+
+	protected override async Task OnInitializedAsync()
+	{
+		entrada.Fecha = DateTime.Now;
+		ProductosDisponibles = await productoService.Listar(p => true);
+
+		if (entrada.EntradasDetalles == null)
+		{
+			entrada.EntradasDetalles = new List<EntradasDetalles>();
+		}
+	}
+
+	private async Task GuardarEntrada()
+	{
+		var productoSeleccionadoPrincipal = ProductosDisponibles.FirstOrDefault(p => p.ProductoId == entrada.IdProducido);
+		if (productoSeleccionadoPrincipal != null)
+		{
+			entrada.PesoTotal = productoSeleccionadoPrincipal.Peso * entrada.CantidadProducida;
+		}
+
+		var guardado = await entradaService.Guardar(entrada);
+
+		if (guardado)
+		{
+			toastService.ShowSuccess("Entrada guardada exitosamente!");
+			navigationManager.NavigateTo("/Entradas/Index");
+			Nuevo();
+		}
+		else
+		{
+			toastService.ShowError("Error al guardar la entrada, verifique el producto y la cantidad.");
+		}
+	}
+
+	public void Nuevo()
+	{
+		this.entrada = new Entradas();
+		this.entrada.Fecha = DateTime.Now;
+		this.entrada.EntradasDetalles = new List<EntradasDetalles>();
+		SelectedProductoId = 0;
+		CantidadDetalle = 0;
+	}
+
+	private async Task AgregarProductoDetalleService()
+	{
+		if (SelectedProductoId <= 0)
+		{
+			toastService.ShowWarning("Debe seleccionar un producto válido.");
+			return;
+		}
+
+		if (CantidadDetalle <= 0)
+		{
+			toastService.ShowWarning("Debe ingresar una cantidad válida mayor que cero.");
+			return;
+		}
+
+		bool agregado = await entradaService.AgregarProductoDetalle(entrada, SelectedProductoId, CantidadDetalle);
+
+		if (agregado)
+		{
+			toastService.ShowSuccess("Producto agregado al detalle.");
+		}
+		else
+		{
+			toastService.ShowError("La cantidad seleccionada supera a la existencia.");
+		}
+
+		SelectedProductoId = 0;
+		CantidadDetalle = 0;
+
+		StateHasChanged();
+	}
+
+	private void RemoverProductoDetalle(EntradasDetalles detalleToRemove)
+	{
+		SelectedProductoId = detalleToRemove.ProductoId;
+		CantidadDetalle = detalleToRemove.Cantidad;
+
+		entrada.EntradasDetalles.Remove(detalleToRemove);
+
+		toastService.ShowInfo("Producto removido del detalle.");
+
+		StateHasChanged();
+	}
+}

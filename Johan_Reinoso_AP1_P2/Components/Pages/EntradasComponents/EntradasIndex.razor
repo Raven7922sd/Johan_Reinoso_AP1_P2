@@ -1,0 +1,151 @@
+﻿@page "/Entradas/Index"
+@inject EntradasService entradasService
+@inject NavigationManager NavigationManager
+@rendermode InteractiveServer
+
+<PageTitle>Consulta de Entradas</PageTitle>
+
+<div class="container">
+	<div class="card shadow-lg">
+		<div class="card-header position-relative text-center">
+			<h4 class="card-title">Consulta de Entradas</h4>
+		</div>
+
+		<div class="card-body">
+			<div class="d-flex justify-content-between align-items-center mb-4">
+				<h5 class="card-title mb-0"><strong>Filtros de B&uacute;squeda</strong></h5>
+				<a href="/Entradas/Create" class="btn btn-success">
+					<span class="bi bi-plus-square"></span> Crear
+				</a>
+			</div>
+
+			<div class="row g-3 align-items-end">
+				
+					<div class="col-md-3">
+						<label class="form-label"><strong>Filtrar por</strong></label>
+						<InputSelect class="form-select" @bind-Value="FiltroCampo">
+							<option value="EntradaId">Id</option>
+							<option value="Concepto">Concepto</option>
+							<option value="Cantidad">Cantidad</option>
+							<option value="PesoTotal">Peso Total</option>
+						</InputSelect>
+					</div>
+
+					<div class="col-md-3">
+						<label class="form-label"><strong>Buscador</strong></label>
+						<div class="input-group">
+							<InputText class="form-control" placeholder="Buscar" @bind-Value="ValorFiltro" @oninput="FiltroAutomatico"/>
+							<button type="button" class="btn btn-outline-primary bi bi-search" @onclick="BuscarEntradas"></button>
+						</div>
+					</div>
+				<div></div>
+				
+					<div class="col-md-3">
+						<label class="form-label"><strong>Desde</strong></label>
+						<div class="input-group">
+							<span class="input-group-text bi bi-calendar-date"></span>
+							<input type="date" class="form-control" @bind-value="FechaDesde" />
+						</div>
+					</div>
+
+					<div class="col-md-3">
+						<label class="form-label"><strong>Hasta</strong></label>
+						<div class="input-group">
+							<span class="input-group-text bi bi-calendar-date-fill"></span>
+							<input type="date" class="form-control" @bind-value="FechaHasta" />
+						</div>
+					</div>
+				
+			</div>
+		</div>
+
+		<div class="table-responsive mt-2">
+			<table class="table table-hover">
+				<thead>
+					<tr>
+						<th>Id</th>
+						<th>Concepto</th>
+						<th>Cantidad</th>
+						<th>Peso Total</th>
+						<th>Fecha</th>
+						<th>Editar</th>
+					</tr>
+				</thead>
+				<tbody>
+					@foreach (var entrada in ListaEntradas)
+					{
+						<tr>
+							<td>@entrada.EntradasId</td>
+							<td>@entrada.Concepto</td>
+							<td>@entrada.EntradasDetalles.FirstOrDefault()?.Cantidad</td>
+							<td>@entrada.PesoTotal.ToString("N2")gr</td>
+							<td>@entrada.Fecha.ToString("dd/MM/yyyy")</td>
+							<td>
+								<a href="/Entradas/Edit/@entrada.EntradasId" class="btn btn-outline-primary bi bi-pencil-square"></a>
+							</td>
+						</tr>
+					}
+				</tbody>
+			</table>
+		</div>
+
+		<div class="container mt-4 d-flex justify-content-between align-items-end">
+			<label class="form-label col-md-1">
+				<strong>Total: @ListaEntradas.Count</strong>
+			</label>
+
+			<label class="form-label col-md-2">
+				<strong>Peso Total: @ListaEntradas.Sum(e => e.PesoTotal).ToString("N2")gr</strong>
+			</label>
+		</div>
+	</div>
+</div>
+
+@code {
+	public List<Entradas> ListaEntradas { get; set; } = new List<Entradas>();
+	public string FiltroCampo { get; set; } = "EntradaId";
+	public string ValorFiltro { get; set; } = string.Empty;
+	public DateTime? FechaDesde { get; set; }
+	public DateTime? FechaHasta { get; set; }
+
+	protected override async Task OnInitializedAsync()
+	{
+		await CargarEntradas();
+	}
+
+	private async Task CargarEntradas()
+	{
+		ListaEntradas = await entradasService.Listar(e => true);
+	}
+
+	private async Task BuscarEntradas()
+	{
+		ListaEntradas = await entradasService.BuscarFiltradosAsync(
+			FiltroCampo,
+			ValorFiltro,
+			FechaDesde,
+			FechaHasta
+		);
+	}
+
+	private async Task FiltroAutomatico(ChangeEventArgs e)
+	{
+		ValorFiltro = e.Value?.ToString() ?? string.Empty;
+		await BuscarEntradas();
+		StateHasChanged();
+	}
+
+	private void EditarEntrada(int id)
+	{
+		NavigationManager.NavigateTo($"/Entradas/Edit/{id}");
+	}
+
+	private async Task EliminarEntrada(int id)
+	{
+		bool eliminado = await entradasService.Eliminar(id);
+		if (eliminado)
+		{
+			await CargarEntradas();
+		}
+	}
+}
