@@ -12,13 +12,11 @@ public class Entradas
     [StringLength(100, ErrorMessage = "Máximo 100 caracteres.")]
     public string Concepto { get; set; } = string.Empty;
 
-    [Required(ErrorMessage = "Campo requerido")]
+
     public decimal PesoTotal { get; set; }
 
     public int IdProducido { get; set; }
 
-    [Required(ErrorMessage = "Campo requerido")]
-    [Range(1, 999, ErrorMessage = "El valor debe ser mayor que cero.")]
     public decimal CantidadProducida { get; set; }
 
     public DateTime Fecha { get; set; } = DateTime.Now;

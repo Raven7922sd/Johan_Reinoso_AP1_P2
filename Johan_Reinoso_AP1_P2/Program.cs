@@ -16,7 +16,8 @@ builder.Services.AddBlazoredToast();
 var conStr = builder.Configuration.GetConnectionString("SqlServerConStr");
 builder.Services.AddDbContextFactory<Contexto>(o => o.UseSqlServer(conStr));
 
-builder.Services.AddScoped<ParcialService>();
+builder.Services.AddScoped<ProductoService>();
+builder.Services.AddScoped<EntradasService>();
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.

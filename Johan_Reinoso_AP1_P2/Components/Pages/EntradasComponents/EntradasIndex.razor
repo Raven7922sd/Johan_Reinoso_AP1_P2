@@ -19,45 +19,44 @@
 				</a>
 			</div>
 
-			<div class="row g-3 align-items-end mb-3">
-
-				<div class="col-md-3">
-					<label class="form-label"><strong>Filtrar por</strong></label>
-					<InputSelect class="form-select" @bind-Value="FiltroCampo">
-						<option value="" disabled selected>Seleccione una opci&oacute;n</option>
-						<option value="EntradaId">Id</option>
-						<option value="Concepto">Concepto</option>
-						<option value="IdProducido">Id Producido</option>
-						<option value="CantidadProducida">Cantidad Producida</option>
-						<option value="PesoTotal">Peso Total</option>
-					</InputSelect>
-				</div>
-
-				<div class="col-md-3">
-					<label class="form-label"><strong>Buscador</strong></label>
-					<div class="input-group">
-						<InputText class="form-control" placeholder="Buscar" @bind-Value="ValorFiltro" />
-						<button type="button" class="btn btn-outline-primary bi bi-search" @onclick="BuscarEntradas"></button>
+			<div class="row g-3 align-items-end">
+				
+					<div class="col-md-3">
+						<label class="form-label"><strong>Filtrar por</strong></label>
+						<InputSelect class="form-select" @bind-Value="FiltroCampo">
+							<option value="EntradaId">Id</option>
+							<option value="Concepto">Concepto</option>
+							<option value="Cantidad">Cantidad</option>
+							<option value="PesoTotal">Peso Total</option>
+						</InputSelect>
 					</div>
-				</div>
 
-				<div class="col-md-3">
-					<label class="form-label"><strong>Desde</strong></label>
-					<div class="input-group">
-						<span class="input-group-text bi bi-calendar-date"></span>
-						<input type="date" class="form-control" @bind-value="FechaHasta" />
+					<div class="col-md-3">
+						<label class="form-label"><strong>Buscador</strong></label>
+						<div class="input-group">
+							<InputText class="form-control" placeholder="Buscar" @bind-Value="ValorFiltro" @oninput="FiltroAutomatico"/>
+							<button type="button" class="btn btn-outline-primary bi bi-search" @onclick="BuscarEntradas"></button>
+						</div>
 					</div>
-				</div>
+				<div></div>
+				
+					<div class="col-md-3">
+						<label class="form-label"><strong>Desde</strong></label>
+						<div class="input-group">
+							<span class="input-group-text bi bi-calendar-date"></span>
+							<input type="date" class="form-control" @bind-value="FechaDesde" />
+						</div>
+					</div>
 
-				<div class="col-md-3">
-					<label class="form-label"><strong>Hasta</strong></label>
-					<div class="input-group">
-						<span class="input-group-text bi bi-calendar-date-fill"></span>
-						<input type="date" class="form-control" @bind-value="FechaHasta" />
+					<div class="col-md-3">
+						<label class="form-label"><strong>Hasta</strong></label>
+						<div class="input-group">
+							<span class="input-group-text bi bi-calendar-date-fill"></span>
+							<input type="date" class="form-control" @bind-value="FechaHasta" />
+						</div>
 					</div>
-				</div>
+				
 			</div>
-
 		</div>
 
 		<div class="table-responsive mt-2">
@@ -65,12 +64,11 @@
 				<thead>
 					<tr>
 						<th>Id</th>
-						<th>Fecha</th>
 						<th>Concepto</th>
-						<th>Id Producido</th>
-						<th>Cantidad Producida</th>
+						<th>Cantidad</th>
 						<th>Peso Total</th>
-						<th></th>
+						<th>Fecha</th>
+						<th>Editar</th>
 					</tr>
 				</thead>
 				<tbody>
@@ -78,18 +76,12 @@
 					{
 						<tr>
 							<td>@entrada.EntradasId</td>
-							<td>@entrada.Fecha.ToShortDateString()</td>
 							<td>@entrada.Concepto</td>
-							<td>@entrada.IdProducido</td>
-							<td>@entrada.CantidadProducida</td>
-							<td>@entrada.PesoTotal.ToString("N2")</td>
+							<td>@entrada.EntradasDetalles.FirstOrDefault()?.Cantidad</td>
+							<td>@entrada.PesoTotal.ToString("N2")gr</td>
+							<td>@entrada.Fecha.ToString("dd/MM/yyyy")</td>
 							<td>
-								<button class="btn btn-primary btn-sm" @onclick="(() => EditarEntrada(entrada.EntradasId))">
-									<span class="bi bi-pencil-square"></span>
-								</button>
-								<button class="btn btn-danger btn-sm" @onclick="(() => EliminarEntrada(entrada.EntradasId))">
-									<span class="bi bi-trash"></span>
-								</button>
+								<a href="/Entradas/Edit/@entrada.EntradasId" class="btn btn-outline-primary bi bi-pencil-square"></a>
 							</td>
 						</tr>
 					}
@@ -103,7 +95,7 @@
 			</label>
 
 			<label class="form-label col-md-2">
-				<strong>Peso Total General: @ListaEntradas.Sum(e => e.PesoTotal).ToString("N2")</strong>
+				<strong>Peso Total: @ListaEntradas.Sum(e => e.PesoTotal).ToString("N2")gr</strong>
 			</label>
 		</div>
 	</div>
@@ -111,7 +103,7 @@
 
 @code {
 	public List<Entradas> ListaEntradas { get; set; } = new List<Entradas>();
-	public string FiltroCampo { get; set; } = string.Empty;
+	public string FiltroCampo { get; set; } = "EntradaId";
 	public string ValorFiltro { get; set; } = string.Empty;
 	public DateTime? FechaDesde { get; set; }
 	public DateTime? FechaHasta { get; set; }
@@ -134,6 +126,13 @@
 			FechaDesde,
 			FechaHasta
 		);
+	}
+
+	private async Task FiltroAutomatico(ChangeEventArgs e)
+	{
+		ValorFiltro = e.Value?.ToString() ?? string.Empty;
+		await BuscarEntradas();
+		StateHasChanged();
 	}
 
 	private void EditarEntrada(int id)

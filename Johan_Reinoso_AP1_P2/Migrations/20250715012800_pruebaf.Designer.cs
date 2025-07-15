@@ -4,6 +4,7 @@ using Johan_Reinoso_AP1_P2.Components.DAL;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 
 #nullable disable
@@ -11,9 +12,11 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Johan_Reinoso_AP1_P2.Migrations
 {
     [DbContext(typeof(Contexto))]
-    partial class ContextoModelSnapshot : ModelSnapshot
+    [Migration("20250715012800_pruebaf")]
+    partial class pruebaf
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -111,7 +114,7 @@ namespace Johan_Reinoso_AP1_P2.Migrations
                             Descripcion = "Maní",
                             EsCompuesto = false,
                             Existencia = 100,
-                            Peso = 5m
+                            Peso = 0m
                         },
                         new
                         {
@@ -119,7 +122,7 @@ namespace Johan_Reinoso_AP1_P2.Migrations
                             Descripcion = "Pistachos",
                             EsCompuesto = false,
                             Existencia = 100,
-                            Peso = 10m
+                            Peso = 0m
                         },
                         new
                         {
@@ -127,7 +130,7 @@ namespace Johan_Reinoso_AP1_P2.Migrations
                             Descripcion = "Almendras",
                             EsCompuesto = false,
                             Existencia = 100,
-                            Peso = 8m
+                            Peso = 0m
                         },
                         new
                         {

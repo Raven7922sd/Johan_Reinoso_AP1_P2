@@ -1,5 +1,257 @@
-﻿<h3>ParcialIndex</h3>
+﻿@page "/Entradas/Edit/{EntradaId:int}"
+@inject EntradasService entradaService
+@inject ProductoService productoService
+@inject NavigationManager navigationManager
+@rendermode InteractiveServer
+@inject IToastService toastService
+@using Johan_Reinoso_AP1_P2.Components.Models
+@using Blazored.Toast.Services
+
+<EditForm Model="@entrada" OnValidSubmit="GuardarEntrada" FormName="EntradaEdit">
+	<DataAnnotationsValidator />
+
+	<div class="container">
+		<div class="card shadow-lg">
+			<div class="card-header">
+				<h4 class="card-title position-relative text-center">Edición de Entrada</h4>
+			</div>
+
+			<div class="card-body">
+				<div class="mb-4">
+					<label class="form-label"><strong>Entrada Id</strong></label>
+					<InputNumber class="form-control" @bind-Value="entrada.EntradasId" readonly />
+				</div>
+
+				<div class="form-group mb-3">
+					<label for="concepto">Concepto:</label>
+					<InputText id="concepto" class="form-control" @bind-Value="entrada.Concepto" placeholder="Agregue un concepto" />
+					<ValidationMessage For="@(() => entrada.Concepto)" />
+				</div>
+
+				<div class="form-group mb-3">
+					<label for="fecha">Fecha:</label>
+					<InputDate id="fecha" class="form-control" @bind-Value="entrada.Fecha" />
+					<ValidationMessage For="@(() => entrada.Fecha)" />
+				</div>
+
+				<div class="border border-success p-3 mt-3">
+
+					<h5 class="text-center mb-4 mt-3">Detalle de Productos de Entrada</h5>
+
+					<div class="input-group input-group-sm mb-2 align-items-center mt-2">
+						<span class="input-group-text py-2 px-2">Producto:</span>
+						<InputSelect class="form-select form-select-sm py-2" @bind-Value="SelectedProductoId">
+							<option value="0" selected disabled>Seleccione un producto</option>
+							@foreach (var producto in ProductosDisponibles)
+							{
+								<option value="@producto.ProductoId">@producto.Descripcion</option>
+							}
+						</InputSelect>
+
+						<span class="input-group-text py-2 px-2 ms-2">Cantidad:</span>
+						<InputNumber class="form-control form-control-sm py-2" @bind-Value="CantidadDetalle" placeholder="Cantidad" />
+
+						<button class="btn btn-primary btn-sm bi bi-plus-square py-2 ms-2" type="button" @onclick="AgregarProductoDetalleService">
+							Agregar
+						</button>
+					</div>
+
+					<hr />
+
+					<table class="table table-light">
+						<thead class="table table-striped">
+							<tr class="text-center">
+								<th>ProductoId</th>
+								<th>Descripcion</th>
+								<th>Cantidad</th>
+								<th>Remover</th>
+							</tr>
+						</thead>
+						<tbody>
+							@if (entrada.EntradasDetalles != null && entrada.EntradasDetalles.Any())
+							{
+								@foreach (var detalle in entrada.EntradasDetalles)
+								{
+									<tr class="text-center">
+										<td>@detalle.Producto?.ProductoId</td>
+										<td>@detalle.Producto?.Descripcion</td>
+										<td>@detalle.Cantidad</td>
+										<td>
+											<button type="button" class="btn btn-outline-danger bi bi-trash"
+													@onclick="() => RemoverProductoDetalle(detalle)">
+												Remover
+											</button>
+										</td>
+									</tr>
+								}
+							}
+							else
+							{
+								<tr>
+									<td colspan="6" class="text-center">No hay productos agregados al detalle.</td>
+								</tr>
+							}
+						</tbody>
+					</table>
+				</div>
+
+				<div class="card-footer text-center mt-2">
+					<div class="btn-group" role="group">
+						<button type="button" class="btn btn-outline-danger bi bi-trash" @onclick="MostrarModalEliminarConfirmacion"> Eliminar</button>
+						<button type="submit" class="btn btn-outline-success bi bi-floppy"> Guardar</button>
+						<a href="/Entradas/Index" class="btn btn-outline-secondary"><span class="bi bi-box-arrow-left"></span> Volver</a>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</EditForm>
+
+@if (MostrarModalEliminar)
+{
+	<div class="modal fade show d-block bg-opacity-50" tabindex="-1" role="dialog" style="background-color: rgba(0,0,0,0.5);">
+		<div class="modal-dialog modal-dialog-centered">
+			<div class="modal-content">
+				<div class="modal-header bg-danger text-white">
+					<h5 class="modal-title">Confirmar Eliminación</h5>
+					<button type="button" class="btn-close" @onclick="CerrarModalEliminar"></button>
+				</div>
+				<div class="modal-body">
+					<p>¿Está seguro de que desea eliminar esta Entrada (@entrada.EntradasId) de forma permanente?</p>
+					<p class="text-danger">Esta acción no se puede deshacer.</p>
+				</div>
+				<div class="modal-footer">
+					<button type="button" class="btn btn-secondary" @onclick="CerrarModalEliminar">Cancelar</button>
+					<button type="button" class="btn btn-danger" @onclick="EliminarEntradaConfirmada">Eliminar</button>
+				</div>
+			</div>
+		</div>
+	</div>
+}
 
 @code {
+	[Parameter]
+	public int EntradaId { get; set; }
 
+	private Entradas entrada = new Entradas();
+	private List<Productos> ProductosDisponibles = new List<Productos>();
+
+	private int SelectedProductoId { get; set; }
+	private int CantidadDetalle { get; set; }
+
+	private bool MostrarModalEliminar { get; set; } = false;
+
+	protected override async Task OnInitializedAsync()
+	{
+		ProductosDisponibles = await productoService.Listar(p => true);
+
+		if (EntradaId > 0)
+		{
+			var entradaEncontrada = await entradaService.Buscar(EntradaId);
+			if (entradaEncontrada != null)
+			{
+				entrada = entradaEncontrada;
+			}
+			else
+			{
+				navigationManager.NavigateTo("/Entradas/Index");
+			}
+		}
+		else
+		{
+			navigationManager.NavigateTo("/Entradas/Create");
+		}
+
+		if (entrada.EntradasDetalles == null)
+		{
+			entrada.EntradasDetalles = new List<EntradasDetalles>();
+		}
+	}
+
+	private async Task GuardarEntrada()
+	{
+		if (entrada.EntradasDetalles == null || !entrada.EntradasDetalles.Any())
+		{
+			toastService.ShowError("No puedes guardar una entrada sin productos en el detalle.");
+			return;
+		}
+		var guardado = await entradaService.Guardar(entrada);
+
+		if (guardado)
+		{
+			toastService.ShowSuccess("Entrada guardada correctamente.");
+			navigationManager.NavigateTo("/Entradas/Index");
+		}
+		else
+		{
+			toastService.ShowError("Error al guardar la entrada. Verifique los datos o la existencia.");
+		}
+	}
+
+	private void Nuevo()
+	{
+		navigationManager.NavigateTo("/Entradas/Create");
+	}
+
+	private async Task AgregarProductoDetalleService()
+	{
+		if (SelectedProductoId == 0 || CantidadDetalle <= 0)
+		{
+			toastService.ShowWarning("Debes seleccionar un producto o ingresar una cantidad válida.");
+			return;
+		}
+
+		bool agregado = await entradaService.AgregarProductoDetalle(entrada, SelectedProductoId, CantidadDetalle);
+
+		if (agregado)
+		{
+			toastService.ShowSuccess("Producto agregado al detalle.");
+		}
+		else
+		{
+			toastService.ShowError("La cantidad seleccionada supera a la existencia.");
+		}
+		SelectedProductoId = 0;
+		CantidadDetalle = 0;
+
+		StateHasChanged();
+	}
+
+	private void RemoverProductoDetalle(EntradasDetalles detalleToRemove)
+	{
+		SelectedProductoId = detalleToRemove.ProductoId;
+		CantidadDetalle = detalleToRemove.Cantidad;
+
+		entrada.EntradasDetalles.Remove(detalleToRemove);
+
+		toastService.ShowInfo("Producto removido del detalle.");
+
+		StateHasChanged();
+	}
+
+	private void MostrarModalEliminarConfirmacion()
+	{
+		MostrarModalEliminar = true;
+	}
+
+	private void CerrarModalEliminar()
+	{
+		MostrarModalEliminar = false;
+	}
+
+	private async Task EliminarEntradaConfirmada()
+	{
+		CerrarModalEliminar();
+
+		bool eliminado = await entradaService.Eliminar(entrada.EntradasId);
+		if (eliminado)
+		{
+			toastService.ShowSuccess("Entrada eliminada exitosamente!");
+			navigationManager.NavigateTo("/Entradas/Index");
+		}
+		else
+		{
+			toastService.ShowError("Error al eliminar la entrada.");
+		}
+	}
 }
