@@ -13,19 +13,13 @@
 	<div class="container">
 		<div class="card shadow-lg">
 			<div class="card-header">
-				<h4 class="card-title position-relative text-center">Registro de Entrada</h4>
+				<h4 class="card-title position-relative text-center">Entrada de Productos Empacados</h4>
 			</div>
 
 			<div class="card-body">
 				<div class="mb-4">
-					<label class="form-label"><strong>Entrada Id</strong></label>
+					<label class="form-label"><strong>Id</strong></label>
 					<InputNumber class="form-control" @bind-Value="entrada.EntradasId" readonly />
-				</div>
-
-				<div class="form-group mb-3">
-					<label for="concepto">Concepto:</label>
-					<InputText id="concepto" class="form-control " @bind-Value="entrada.Concepto" placeholder="Agregue un concepto" />
-					<ValidationMessage For="@(() => entrada.Concepto)" />
 				</div>
 
 				<div class="form-group mb-3">
@@ -34,9 +28,15 @@
 					<ValidationMessage For="@(() => entrada.Fecha)" />
 				</div>
 
+				<div class="form-group mb-3">
+					<label for="concepto">Concepto:</label>
+					<InputText id="concepto" class="form-control " @bind-Value="entrada.Concepto" placeholder="Agregue un concepto" />
+					<ValidationMessage For="@(() => entrada.Concepto)" />
+				</div>
+
 				<div class="border border-success p-3 mt-3">
 
-					<h5 class="text-center mb-4 mt-3">Detalle de Productos de Entrada</h5>
+					<h5 class="text-center mb-4 mt-3">Productos Utilizados</h5>
 
 					<div class="input-group input-group-sm mb-2 align-items-center mt-2">
 						<span class="input-group-text py-2 px-2">Producto:</span>
@@ -95,11 +95,35 @@
 							}
 						</tbody>
 					</table>
+					<div class="form-group mb-3 mt-3">
+						<label for="pesoTotal"><strong>Peso total</strong></label>
+						<InputNumber class="form-control" @bind-Value="entrada.PesoTotal" readonly />
+					</div>
+				</div>
+
+				<div class="border border-success p-3 mt-3">
+					<h5 class="text-center mb-4 mt-3">Producido</h5>
+
+					<div class="input-group input-group-sm mb-2 align-items-center mt-2">
+						<span class="input-group-text py-2 px-2">Producto:</span>
+						<InputSelect class="form-select form-select-sm py-2" @bind-Value="entrada.IdProducido">
+							<option value="0" selected disabled>Seleccione el producto producido</option>
+							@foreach (var producto in ProductosDisponibles)
+							{
+								<option value="@producto.ProductoId">@producto.Descripcion</option>
+							}
+						</InputSelect>
+						<ValidationMessage For="(() => entrada.IdProducido)" />
+
+						<span class="input-group-text py-2 px-2 ms-2">Cantidad:</span>
+						<InputNumber class="form-control form-control-sm py-2" @bind-Value="entrada.CantidadProducida" placeholder="Cantidad Producida" />
+						<ValidationMessage For="(() => entrada.CantidadProducida)" />
+					</div>
 				</div>
 
 				<div class="card-footer text-center mt-2">
 					<div class="btn-group" role="group">
-						<button type="reset" class="btn btn-outline-primary bi bi-arrow-clockwise" @onclick="Nuevo">Limpiar</button>
+						<button type="reset" class="btn btn-outline-primary bi bi-arrow-clockwise" @onclick="Nuevo">Nuevo</button>
 						<button type="submit" class="btn btn-outline-success bi bi-floppy"> Guardar</button>
 						<a href="/Entradas/Index" class="btn btn-outline-secondary"><span class="bi bi-box-arrow-left"></span> Volver</a>
 					</div>
@@ -131,10 +155,27 @@
 
 	private async Task GuardarEntrada()
 	{
-		var productoSeleccionadoPrincipal = ProductosDisponibles.FirstOrDefault(p => p.ProductoId == entrada.IdProducido);
-		if (productoSeleccionadoPrincipal != null)
+		if (entrada.IdProducido <= 0)
 		{
-			entrada.PesoTotal = productoSeleccionadoPrincipal.Peso * entrada.CantidadProducida;
+			toastService.ShowWarning("Debe seleccionar un producto en la sección 'Producido'.");
+			return;
+		}
+
+		if (entrada.CantidadProducida <= 0)
+		{
+			toastService.ShowWarning("Debe ingresar una cantidad válida mayor que cero en la sección 'Producido'.");
+			return;
+		}
+
+		var productoProducido = ProductosDisponibles.FirstOrDefault(p => p.ProductoId == entrada.IdProducido);
+		if (productoProducido != null)
+		{
+			entrada.PesoTotal = productoProducido.Peso * entrada.CantidadProducida;
+			
+		}
+		else
+		{
+			entrada.PesoTotal = 0; 
 		}
 
 		var guardado = await entradaService.Guardar(entrada);
@@ -158,6 +199,10 @@
 		this.entrada.EntradasDetalles = new List<EntradasDetalles>();
 		SelectedProductoId = 0;
 		CantidadDetalle = 0;
+
+		entrada.IdProducido = 0;
+		entrada.CantidadProducida = 0;
+		entrada.PesoTotal = 0;
 	}
 
 	private async Task AgregarProductoDetalleService()
