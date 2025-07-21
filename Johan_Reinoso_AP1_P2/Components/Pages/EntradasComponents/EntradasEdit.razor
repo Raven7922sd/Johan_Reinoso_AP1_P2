@@ -34,9 +34,10 @@
 					<ValidationMessage For="@(() => entrada.Fecha)" />
 				</div>
 
+
 				<div class="border border-success p-3 mt-3">
 
-					<h5 class="text-center mb-4 mt-3">Detalle de Productos de Entrada</h5>
+					<h5 class="text-center mb-4 mt-3">Productos Utilizados</h5>
 
 					<div class="input-group input-group-sm mb-2 align-items-center mt-2">
 						<span class="input-group-text py-2 px-2">Producto:</span>
@@ -47,9 +48,11 @@
 								<option value="@producto.ProductoId">@producto.Descripcion</option>
 							}
 						</InputSelect>
+						<ValidationMessage For="(() => entradasDetalles.ProductoId)" />
 
 						<span class="input-group-text py-2 px-2 ms-2">Cantidad:</span>
 						<InputNumber class="form-control form-control-sm py-2" @bind-Value="CantidadDetalle" placeholder="Cantidad" />
+						<ValidationMessage For="(() => entradasDetalles.Cantidad)" />
 
 						<button class="btn btn-primary btn-sm bi bi-plus-square py-2 ms-2" type="button" @onclick="AgregarProductoDetalleService">
 							Agregar
@@ -93,7 +96,32 @@
 							}
 						</tbody>
 					</table>
+					<div class="form-group mb-3 mt-3">
+						<label for="pesoTotal"><strong>Peso total</strong></label>
+						<InputNumber class="form-control" @bind-Value="entrada.PesoTotal" readonly />
+					</div>
 				</div>
+
+				<div class="border border-success p-3 mt-3">
+					<h5 class="text-center mb-4 mt-3">Producido</h5>
+
+					<div class="input-group input-group-sm mb-2 align-items-center mt-2">
+						<span class="input-group-text py-2 px-2">Producto:</span>
+						<InputSelect class="form-select form-select-sm py-2" @bind-Value="entrada.IdProducido">
+							<option value="0" selected disabled>Seleccione el producto producido</option>
+							@foreach (var producto in ProductosDisponibles)
+							{
+								<option value="@producto.ProductoId">@producto.Descripcion</option>
+							}
+						</InputSelect>
+						<ValidationMessage For="(() => entrada.IdProducido)" />
+
+						<span class="input-group-text py-2 px-2 ms-2">Cantidad:</span>
+						<InputNumber class="form-control form-control-sm py-2" @bind-Value="entrada.CantidadProducida" placeholder="Cantidad Producida" />
+						<ValidationMessage For="(() => entrada.CantidadProducida)" />
+					</div>
+				</div>
+
 
 				<div class="card-footer text-center mt-2">
 					<div class="btn-group" role="group">
@@ -132,7 +160,7 @@
 @code {
 	[Parameter]
 	public int EntradaId { get; set; }
-
+	private EntradasDetalles entradasDetalles { get; set; } = new EntradasDetalles();
 	private Entradas entrada = new Entradas();
 	private List<Productos> ProductosDisponibles = new List<Productos>();
 
