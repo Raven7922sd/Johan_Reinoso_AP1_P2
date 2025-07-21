@@ -17,7 +17,9 @@ public class Entradas
 
     public int IdProducido { get; set; }
 
-    public decimal CantidadProducida { get; set; }
+    public int CantidadProducida { get; set; }
+
+    public Productos? ProductoProducido { get; set; }
 
     public DateTime Fecha { get; set; } = DateTime.Now;
 
