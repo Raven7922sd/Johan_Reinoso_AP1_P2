@@ -17,6 +17,17 @@ namespace Johan_Reinoso_AP1_P2.Components.Service
 
         public async Task<bool> Guardar(Entradas entrada)
         {
+            if (entrada.IdProducido > 0 && entrada.ProductoProducido == null)
+            {
+                await using var contextCarga = await _dbFactory.CreateDbContextAsync();
+                entrada.ProductoProducido = await contextCarga.productos.FindAsync(entrada.IdProducido);
+                if (entrada.ProductoProducido == null)
+                {
+                    Console.WriteLine($"Error: Producto producido con ID {entrada.IdProducido} no encontrado.");
+                    return false;
+                }
+            }
+
             if (!await ExisteId(entrada.EntradasId))
             {
                 return (await Insertar(entrada));
@@ -49,60 +60,59 @@ namespace Johan_Reinoso_AP1_P2.Components.Service
 
                 foreach (var detalle in entrada.EntradasDetalles)
                 {
-                    if (detalle.ProductoId <= 0)
+                    if (detalle.ProductoId <= 0 || detalle.Cantidad <= 0)
                     {
                         await transaction.RollbackAsync();
-                        Console.WriteLine($"Error: Detalle con ID {detalle.EntradasDetallesId} tiene un ProductoId inválido.");
+                        Console.WriteLine($"Error: Detalle inválido. ProductoId: {detalle.ProductoId}, Cantidad: {detalle.Cantidad}");
                         return false;
                     }
 
-                    if (detalle.Cantidad <= 0)
+                    var productoUtilizado = await context.productos.FindAsync(detalle.ProductoId);
+                    if (productoUtilizado == null)
                     {
                         await transaction.RollbackAsync();
-                        Console.WriteLine($"Error: Detalle con ID {detalle.EntradasDetallesId} tiene una Cantidad inválida (debe ser mayor que 0).");
+                        Console.WriteLine($"Error: Producto utilizado con ID {detalle.ProductoId} no encontrado.");
                         return false;
                     }
 
-                    if (detalle.Producto == null)
-                    {
-                        var productoEnContexto = context.productos.Local.FirstOrDefault(p => p.ProductoId == detalle.ProductoId);
-                        if (productoEnContexto != null)
-                        {
-                            detalle.Producto = productoEnContexto;
-                        }
-                        else
-                        {
-                            var productoDesdeDb = await context.productos.FindAsync(detalle.ProductoId);
-                            if (productoDesdeDb != null)
-                            {
-                                detalle.Producto = productoDesdeDb;
-                                context.Entry(detalle.Producto).State = EntityState.Unchanged;
-                            }
-                            else
-                            {
-                                await transaction.RollbackAsync();
-                                Console.WriteLine($"Error: Producto con ID {detalle.ProductoId} no encontrado para un detalle.");
-                                return false;
-                            }
-                        }
-                    }
-                    else
-                    {
-                        context.Entry(detalle.Producto).State = EntityState.Unchanged;
-                    }
+                    detalle.Producto = productoUtilizado;
 
-                    var productoToUpdate = await context.productos.FindAsync(detalle.ProductoId);
-                    if (productoToUpdate == null || productoToUpdate.Existencia < detalle.Cantidad)
+                    if (productoUtilizado.Existencia < detalle.Cantidad)
                     {
                         await transaction.RollbackAsync();
-                        Console.WriteLine($"Error: Existencia insuficiente para ProductoId {detalle.ProductoId}. Requerido: {detalle.Cantidad}, Disponible: {productoToUpdate?.Existencia ?? 0}");
+                        Console.WriteLine($"Error: Existencia insuficiente para ProductoId {detalle.ProductoId}. Requerido: {detalle.Cantidad}, Disponible: {productoUtilizado.Existencia}");
                         return false;
                     }
-                    productoToUpdate.Existencia -= detalle.Cantidad;
-                    context.productos.Update(productoToUpdate);
+                    productoUtilizado.Existencia -= detalle.Cantidad; 
+                    context.productos.Update(productoUtilizado);
                 }
 
-                entrada.PesoTotal = entrada.EntradasDetalles.Sum(d => d.Cantidad * (d.Producto?.Peso ?? 0));
+                if (entrada.IdProducido > 0)
+                {
+                    var productoProducido = await context.productos.FindAsync(entrada.IdProducido);
+                    if (productoProducido == null)
+                    {
+                        await transaction.RollbackAsync();
+                        Console.WriteLine($"Error: Producto producido con ID {entrada.IdProducido} no encontrado.");
+                        return false;
+                    }
+
+                    if (productoProducido.Existencia < entrada.CantidadProducida)
+                    {
+                        await transaction.RollbackAsync();
+                        Console.WriteLine($"Error: Existencia insuficiente para el Producto Producido (ID: {entrada.IdProducido}). Requerido: {entrada.CantidadProducida}, Disponible: {productoProducido.Existencia}");
+                        return false;
+                    }
+
+                    entrada.ProductoProducido = productoProducido;
+                }
+                else
+                {
+                    entrada.IdProducido = 0;
+                    entrada.CantidadProducida = 0;
+                }
+
+                entrada.PesoTotal = entrada.EntradasDetalles.Sum(d => d.Cantidad * (d.Producto?.Peso ?? 0m));
 
                 context.entradas.Add(entrada);
                 await context.SaveChangesAsync();
@@ -116,7 +126,6 @@ namespace Johan_Reinoso_AP1_P2.Components.Service
                 return false;
             }
         }
-
         public async Task<bool> Modificar(Entradas entrada)
         {
             await using var context = await _dbFactory.CreateDbContextAsync();
@@ -127,6 +136,8 @@ namespace Johan_Reinoso_AP1_P2.Components.Service
                 var entradaExistente = await context.entradas
                                                     .Include(e => e.EntradasDetalles)
                                                         .ThenInclude(ed => ed.Producto)
+                                                    .Include(e => e.ProductoProducido)
+                                                    .AsTracking()
                                                     .FirstOrDefaultAsync(e => e.EntradasId == entrada.EntradasId);
 
                 if (entradaExistente == null)
@@ -139,23 +150,23 @@ namespace Johan_Reinoso_AP1_P2.Components.Service
                 {
                     var newDetalle = entrada.EntradasDetalles.FirstOrDefault(d => d.EntradasDetallesId == detalleExistente.EntradasDetallesId);
 
-                    if (newDetalle == null)
+                    if (newDetalle == null) 
                     {
                         var producto = await context.productos.FindAsync(detalleExistente.ProductoId);
                         if (producto != null)
                         {
-                            producto.Existencia += detalleExistente.Cantidad;
+                            producto.Existencia += detalleExistente.Cantidad; 
                             context.productos.Update(producto);
                         }
                         context.entradasDetalles.Remove(detalleExistente);
                     }
-                    else if (newDetalle.Cantidad != detalleExistente.Cantidad)
+                    else if (newDetalle.Cantidad != detalleExistente.Cantidad) 
                     {
                         var producto = await context.productos.FindAsync(detalleExistente.ProductoId);
                         if (producto != null)
                         {
                             int quantityDifference = detalleExistente.Cantidad - newDetalle.Cantidad;
-                            producto.Existencia += quantityDifference;
+                            producto.Existencia += quantityDifference; 
                             context.productos.Update(producto);
                         }
                     }
@@ -170,47 +181,71 @@ namespace Johan_Reinoso_AP1_P2.Components.Service
                         detalleNuevoOModificado.EntradasId = entrada.EntradasId;
                         context.entradasDetalles.Add(detalleNuevoOModificado);
 
-                        if (detalleNuevoOModificado.Producto == null && detalleNuevoOModificado.ProductoId > 0)
-                        {
-                            var producto = await context.productos.FirstOrDefaultAsync(p => p.ProductoId == detalleNuevoOModificado.ProductoId);
-                            if (producto != null)
-                            {
-                                detalleNuevoOModificado.Producto = producto;
-                            }
-                            else
-                            {
-                                await transaction.RollbackAsync();
-                                return false;
-                            }
-                        }
-
                         var productoToUpdate = await context.productos.FindAsync(detalleNuevoOModificado.ProductoId);
                         if (productoToUpdate == null || productoToUpdate.Existencia < detalleNuevoOModificado.Cantidad)
                         {
                             await transaction.RollbackAsync();
+                            Console.WriteLine($"Error (Modificar): Existencia insuficiente para ProductoId {detalleNuevoOModificado.ProductoId}.");
                             return false;
                         }
                         productoToUpdate.Existencia -= detalleNuevoOModificado.Cantidad;
                         context.productos.Update(productoToUpdate);
-
                     }
                     else
                     {
-                        detalleDb.Cantidad = detalleNuevoOModificado.Cantidad;
+                        context.Entry(detalleDb).CurrentValues.SetValues(detalleNuevoOModificado);
+                    }
 
-                        if (detalleDb.Producto == null && detalleDb.ProductoId > 0)
+                    if (detalleNuevoOModificado.Producto == null && detalleNuevoOModificado.ProductoId > 0)
+                    {
+                        var producto = await context.productos.FirstOrDefaultAsync(p => p.ProductoId == detalleNuevoOModificado.ProductoId);
+                        if (producto != null)
                         {
-                            var producto = await context.productos.FirstOrDefaultAsync(p => p.ProductoId == detalleDb.ProductoId);
-                            if (producto != null)
-                            {
-                                detalleDb.Producto = producto;
-                            }
+                            detalleNuevoOModificado.Producto = producto;
                         }
                     }
                 }
 
+                if (entradaExistente.IdProducido > 0 && entradaExistente.IdProducido != entrada.IdProducido)
+                {
+                    var oldProductoProducido = await context.productos.FindAsync(entradaExistente.IdProducido);
+                    if (oldProductoProducido != null)
+                    {
+                        oldProductoProducido.Existencia += entradaExistente.CantidadProducida;
+                        context.productos.Update(oldProductoProducido);
+                    }
+                }
+
+                if (entrada.IdProducido > 0)
+                {
+                    var newProductoProducido = await context.productos.FindAsync(entrada.IdProducido);
+                    if (newProductoProducido == null)
+                    {
+                        await transaction.RollbackAsync();
+                        Console.WriteLine($"Error (Modificar): Producto producido con ID {entrada.IdProducido} no encontrado.");
+                        return false;
+                    }
+
+                    context.productos.Update(newProductoProducido);
+
+                    entrada.ProductoProducido = newProductoProducido;
+                }
+                else 
+                {
+                    if (entradaExistente.IdProducido > 0)
+                    {
+                        var oldProductoProducido = await context.productos.FindAsync(entradaExistente.IdProducido);
+                        if (oldProductoProducido != null)
+                        {
+                            oldProductoProducido.Existencia += entradaExistente.CantidadProducida; // SUMA la cantidad que se había restado
+                            context.productos.Update(oldProductoProducido);
+                        }
+                    }
+                    entrada.CantidadProducida = 0;
+                }
+
                 context.Entry(entradaExistente).CurrentValues.SetValues(entrada);
-                entradaExistente.PesoTotal = entradaExistente.EntradasDetalles.Sum(d => d.Cantidad * (d.Producto?.Peso ?? 0));
+                entradaExistente.PesoTotal = entrada.EntradasDetalles.Sum(d => d.Cantidad * (d.Producto?.Peso ?? 0m));
 
                 await context.SaveChangesAsync();
                 await transaction.CommitAsync();
@@ -232,9 +267,10 @@ namespace Johan_Reinoso_AP1_P2.Components.Service
             try
             {
                 var entradaAEliminar = await context.entradas
-                                                     .Include(e => e.EntradasDetalles)
-                                                         .ThenInclude(ed => ed.Producto)
-                                                     .FirstOrDefaultAsync(e => e.EntradasId == entradaId);
+                                                    .Include(e => e.EntradasDetalles)
+                                                        .ThenInclude(ed => ed.Producto)
+                                                    .Include(e => e.ProductoProducido)
+                                                    .FirstOrDefaultAsync(e => e.EntradasId == entradaId);
 
                 if (entradaAEliminar == null)
                 {
@@ -271,6 +307,7 @@ namespace Johan_Reinoso_AP1_P2.Components.Service
             return await context.entradas
                                 .Include(e => e.EntradasDetalles)
                                     .ThenInclude(ed => ed.Producto)
+                                .Include(e => e.ProductoProducido)
                                 .AsNoTracking()
                                 .FirstOrDefaultAsync(e => e.EntradasId == entradaId);
         }
@@ -281,6 +318,7 @@ namespace Johan_Reinoso_AP1_P2.Components.Service
             return await context.entradas
                                 .Include(e => e.EntradasDetalles)
                                     .ThenInclude(ed => ed.Producto)
+                                .Include(e => e.ProductoProducido)
                                 .Where(criterio)
                                 .AsNoTracking()
                                 .ToListAsync();
@@ -297,6 +335,7 @@ namespace Johan_Reinoso_AP1_P2.Components.Service
             IQueryable<Entradas> query = context.entradas
                                                 .Include(e => e.EntradasDetalles)
                                                     .ThenInclude(ed => ed.Producto)
+                                                .Include(e => e.ProductoProducido)
                                                 .AsNoTracking();
 
             if (!string.IsNullOrWhiteSpace(valorFiltro))
@@ -308,9 +347,13 @@ namespace Johan_Reinoso_AP1_P2.Components.Service
                 else if (filtroCampo == "Concepto")
                     query = query.Where(x => x.Concepto.ToLower().Contains(valor));
                 else if (filtroCampo == "Cantidad" && int.TryParse(valorFiltro, out var cantidad))
-                    query = query.Where(x => x.EntradasDetalles.FirstOrDefault().Cantidad == cantidad);
+                    query = query.Where(x => x.EntradasDetalles.Any(d => d.Cantidad == cantidad));
                 else if (filtroCampo == "PesoTotal" && decimal.TryParse(valorFiltro, out var peso))
                     query = query.Where(x => x.PesoTotal == peso);
+                else if (filtroCampo == "IdProducido" && int.TryParse(valorFiltro, out var idProd))
+                    query = query.Where(x => x.IdProducido == idProd);
+                else if (filtroCampo == "CantidadProducida" && decimal.TryParse(valorFiltro, out var cantProd))
+                    query = query.Where(x => x.CantidadProducida == cantProd);
             }
 
             if (fechaDesde.HasValue)
