@@ -27,7 +27,7 @@
 							<option value="EntradaId">Id</option>
 							<option value="Concepto">Concepto</option>
 							<option value="Cantidad">Cantidad</option>
-							<option value="PesoTotal">Peso Total</option>
+							<option value="PesoTotal">Peso</option>
 						</InputSelect>
 					</div>
 
@@ -65,8 +65,8 @@
 					<tr>
 						<th>Id</th>
 						<th>Concepto</th>
-						<th>Cantidad</th>
-						<th>Peso Total</th>
+						<th class="text-center">Cantidad</th>
+						<th>Peso por unidad</th>
 						<th>Fecha</th>
 						<th>Editar</th>
 					</tr>
@@ -77,7 +77,7 @@
 						<tr>
 							<td>@entrada.EntradasId</td>
 							<td>@entrada.Concepto</td>
-							<td>@entrada.EntradasDetalles.FirstOrDefault()?.Cantidad</td>
+							<td class="text-center">@entrada.EntradasDetalles.FirstOrDefault()?.Cantidad</td>
 							<td>@entrada.PesoTotal.ToString("N2")gr</td>
 							<td>@entrada.Fecha.ToString("dd/MM/yyyy")</td>
 							<td>
@@ -95,7 +95,7 @@
 			</label>
 
 			<label class="form-label col-md-2">
-				<strong>Peso Total: @ListaEntradas.Sum(e => e.PesoTotal).ToString("N2")gr</strong>
+				<strong>Peso Total: @ListaEntradas.Sum(e => e.PesoTotal/1000).ToString("N2")kg</strong>
 			</label>
 		</div>
 	</div>
